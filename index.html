@@ -1919,73 +1919,15 @@
     </section>
 
     <section>
-      <h3>The <dfn data-lt="subscription identifier">create a subscription identifier</dfn> algorithm</h3>
-      <div>
-        A single <a>Property</a> or <a>Event</a> can be the target of several
-        active {{Subscription}}s at the same time, as long as they are made
-        with different URI variables. To distinguish between them, a
-        <a>subscription identifier</a> is used as the key of the
-        {{ConsumedThing/[[activeObservations]]}} and
-        {{ConsumedThing/[[activeSubscriptions]]}} internal slots instead of
-        plainly using the <a>Property</a> or <a>Event</a> name.
-        <p>
-          To <a>create a subscription identifier</a> given |name:string| and
-          |options:InteractionOptions|, run the following steps:
-        </p>
-        <ol>
-          <li>
-            Let |identifier| be |name|.
-          </li>
-          <li>
-            If |options|.|uriVariables| [=map/exists=], then:
-            <ol>
-              <li>
-                Let |keys| be the result of getting the keys of
-                |options|.|uriVariables|, sorted in ascending code point
-                order.
-              </li>
-              <li>
-                For each |key| in |keys|, set |identifier| to the
-                concatenation of |identifier|, `"&"`, |key|, `"="`, and the
-                result of running <a data-cite=
-                "infra#serialize-a-javascript-value-to-a-json-string">
-                serialize a JavaScript value to a JSON string</a> on
-                |options|.|uriVariables|[|key|].
-              </li>
-            </ol>
-          </li>
-          <li>
-            Return |identifier|.
-          </li>
-        </ol>
-        <p class="note">
-          <a>Protocol Bindings</a> MAY apply their own, more elaborate,
-          rationale for deciding whether two requests represent distinct
-          subscriptions. At the time of writing, [[!wot-thing-description11]]
-          only allows a client to distinguish requests to observe a
-          <a>Property</a> by their URI variables, and requests to subscribe to
-          an <a>Event</a> by their URI variables and subscription data;
-          implementations are therefore not expected to need anything more
-          elaborate than the algorithm above. Regardless of the algorithm
-          used, an implementation MUST NOT multiplex several {{Subscription}}s
-          (e.g., several listener functions) onto a single underlying
-          protocol-level subscription: every active {{Subscription}} is
-          expected to correspond to its own request to, and its own
-          notifications from, the underlying platform.
-        </p>
-      </div>
-    </section>
-
-    <section>
       <h3>The <dfn>observeProperty()</dfn> method</h3>
       <div>
         Makes a request for <a>Property</a> value change notifications.
         Takes as arguments |propertyName:string|, |listener:InteractionListener| and
         optionally |onerror:ErrorListener| and |options:InteractionOptions|.
         It returns a {{Promise}} that resolves on success and rejects on failure.
-        <p class="ednote">
+        <p class="note">
           This algorithm allows for only one active {{Subscription}} per
-          <a>Property</a> and <a>subscription identifier</a> (i.e., per
+          <a>Property</a> and <a>subscription identifier</a> (e.g., per
           combination of URI variables used to observe the <a>Property</a>).
           If a new {{Subscription}} is made with the same <a>Property</a> and
           the same URI variables while an existing {{Subscription}} is active,
@@ -2012,8 +1954,8 @@
           </li>
           <li>
             Let |observationId| be the result of running the
-            <a>create a subscription identifier</a> steps given |propertyName|
-            and |options|.
+            <a>create a subscription identifier</a> operation given
+            |propertyName| and |options|.
           </li>
           <li>
             If |thing|.{{ConsumedThing/[[activeObservations]]}}[|observationId|] [=map/exists=], [=reject=] |promise| with a {{NotAllowedError}} and stop.
@@ -2181,7 +2123,7 @@
         It returns a {{Promise}} to signal success or failure.
         <p class="ednote">
           This algorithm allows for only one active {{Subscription}} per
-          <a>Event</a> and <a>subscription identifier</a> (i.e., per
+          <a>Event</a> and <a>subscription identifier</a> (e.g., per
           combination of URI variables used to subscribe to the <a>Event</a>).
           If a new {{Subscription}} is made with the same <a>Event</a> and the
           same URI variables while an existing {{Subscription}} is active, the
@@ -2208,8 +2150,8 @@
           </li>
           <li>
             Let |subscriptionId| be the result of running the
-            <a>create a subscription identifier</a> steps given |eventName|
-            and |options|.
+            <a>create a subscription identifier</a> operation given
+            |eventName| and |options|.
           </li>
           <li>
             If |thing|.{{ConsumedThing/[[activeSubscriptions]]}}[|subscriptionId|] [=map/exists=], [=reject=] |promise| with a {{NotAllowedError}} and stop.
@@ -2563,6 +2505,46 @@
           </li>
         </ol>
       </section>
+    </section>
+
+    <section>
+      <h3><dfn data-lt="subscription identifier">Create a subscription identifier</dfn> operation</h3>
+      <div>
+        A single <a>Property</a> or <a>Event</a> can be the target of several
+        active {{Subscription}}s at the same time, as long as they can be
+        told apart. To distinguish between them, a <a>subscription
+          identifier</a> is used as the key of the
+        {{ConsumedThing/[[activeObservations]]}} and
+        {{ConsumedThing/[[activeSubscriptions]]}} internal slots instead of
+        plainly using the <a>Property</a> or <a>Event</a> name.
+        <p>
+          To <a>create a subscription identifier</a> given |name:string| and
+          |options:InteractionOptions|, return an [=implementation-defined=]
+          value that uniquely identifies the combination of |name| and
+          |options| among the {{ConsumedThing}}'s active {{Subscription}}s.
+          Two requests that yield the same identifier are considered to be
+          the same subscription; a request that yields a new identifier
+          MUST result in its own, separate request to the underlying
+          protocol binding, so that no two {{Subscription}}s ever share a single
+          protocol-level subscription.
+        </p>
+        <p class="note">
+          At the time of writing, [[!wot-thing-description11]] only lets a
+          client distinguish requests to observe a <a>Property</a> by their
+          URI variables, and requests to subscribe to an <a>Event</a> by
+          their URI variables and subscription data. Implementations are
+          therefore expected to derive the identifier from |name| together
+          with those values.
+        </p>
+        <p class="ednote" title="Implementation feedback">
+          This operation is intentionally left implementation-defined rather
+          than specified as a concrete algorithm. Feedback on whether a more
+          precise algorithm is needed, and on which parameters should
+          participate in the identifier, is welcome on the
+          <a href="https://github.com/w3c/wot-scripting-api/issues">GitHub
+            Issues</a> page.
+        </p>
+      </div>
     </section>
 
     <section>
